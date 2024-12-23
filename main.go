@@ -1,12 +1,8 @@
 package main
 
 import (
-	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 )
 
@@ -16,10 +12,24 @@ const (
 )
 
 var (
-	owner   = flag.String("owner", "", "owner")
-	repo    = flag.String("repo", "", "repository")
-	archive = flag.String("archive", "zip", "preferred archive type")
+	owner       = flag.String("owner", "", "owner (mandatory)")
+	repo        = flag.String("repo", "", "repository (mandatory)")
+	archive     = flag.String("archive", "zip", "preferred archive type")
+	osType      = flag.String("os", "", "operating system")
+	arch        = flag.String("arch", "", "architecture")
+	extractPath = flag.String("extract", ".", "path to extract archive")
+	restart     = flag.String("restart", "", "unit name to restart systemd service")
 )
+
+type runConfig struct {
+	owner       string
+	repo        string
+	archive     string
+	osType      string
+	arch        string
+	extractPath string
+	restart     string
+}
 
 func main() {
 	flag.Parse()
@@ -27,73 +37,49 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	if err := run(*owner, *repo, *archive); err != nil {
+
+	if err := run(runConfig{
+		owner:       *owner,
+		repo:        *repo,
+		archive:     *archive,
+		osType:      *osType,
+		arch:        *arch,
+		extractPath: *extractPath,
+		restart:     *restart,
+	}); err != nil {
 		panic(err)
 	}
 }
 
-func run(owner, repo, archive string) error {
-	release, err := getRelease(owner, repo)
+func run(c runConfig) error {
+	release, err := getRelease(c.owner, c.repo)
 	if err != nil {
 		return fmt.Errorf("failed to get release: %w", err)
 	}
-	err = downloadAsset(release, archive)
+	asset, err := downloadAsset(release, c.archive, c.osType, c.arch)
 	if err != nil {
 		return fmt.Errorf("failed to download asset: %w", err)
 	}
-
-	return nil
-}
-
-func getRelease(owner, repo string) (*Release, error) {
-	url := fmt.Sprintf(ghAPIURL, owner, repo)
-	resp, err := http.Get(url)
+	wd, err := os.Getwd()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get metadata: %w", err)
-	}
-	defer resp.Body.Close()
-
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read metadata: %w", err)
+		return fmt.Errorf("failed to get working directory: %w", err)
 	}
 
-	var release Release
-	err = json.Unmarshal(data, &release)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal metadata: %w", err)
+	extractPath := c.extractPath
+	if extractPath == "." {
+		extractPath = fmt.Sprintf("%s%c", wd, os.PathSeparator)
 	}
 
-	return &release, nil
-}
+	err = extract(asset.Name, extractPath)
+	if err != nil {
+		return fmt.Errorf("failed to extract asset: %w", err)
+	}
 
-func downloadAsset(release *Release, archive string) error {
-	for _, asset := range release.Assets {
-		if asset.ContentType != fmt.Sprintf("application/%s", archive) {
-			continue
-		}
-		resp, err := http.Get(asset.BrowserDownloadURL)
+	if c.restart != "" {
+		err = restartSystemDService(c.restart)
 		if err != nil {
-			return fmt.Errorf("failed to download asset: %w", err)
+			return fmt.Errorf("failed to restart systemd service: %w", err)
 		}
-		defer resp.Body.Close()
-
-		out, err := os.Create(asset.Name)
-		if err != nil {
-			return fmt.Errorf("failed to create file: %w", err)
-		}
-		defer out.Close()
-
-		written, err := io.Copy(out, resp.Body)
-		if err != nil {
-			return fmt.Errorf("failed to write asset to file: %w", err)
-		}
-
-		if written != asset.Size {
-			return errors.New("failed to download asset: size mismatch")
-		}
-
-		return nil
 	}
 
 	return nil
