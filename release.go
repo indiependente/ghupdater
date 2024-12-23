@@ -7,6 +7,11 @@ import (
 	"net/http"
 )
 
+const (
+	// GitHub API URL
+	ghAPIURL = "https://api.github.com/repos/%s/%s/releases/latest"
+)
+
 func getRelease(owner, repo string) (*Release, error) {
 	url := fmt.Sprintf(ghAPIURL, owner, repo)
 	resp, err := http.Get(url)

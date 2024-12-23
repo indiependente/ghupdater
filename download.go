@@ -7,11 +7,41 @@ import (
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/schollz/progressbar/v3"
 )
 
-func selectAsset(release *Release, archive, osType, arch string) (*Asset, error) {
+func listAssets(release *Release, archive, osType, arch string) []string {
+	assets := make([]string, 0)
 	for _, asset := range release.Assets {
-		if asset.ContentType == fmt.Sprintf("application/%s", archive) &&
+		if strings.Contains(asset.Name, osType) &&
+			strings.Contains(asset.Name, arch) &&
+			strings.Contains(asset.Name, archive) {
+			assets = append(assets, asset.Name)
+		}
+	}
+
+	return assets
+}
+
+func selectAsset(release *Release, archive, osType, arch string) (*Asset, error) {
+	var contentType string
+	switch archive {
+	case "zip":
+		contentType = "zip"
+	case "tar":
+		contentType = "x-tar"
+	case "tar.gz":
+		contentType = "gzip"
+	case "tar.bz2":
+		contentType = "bzip2"
+	case "tar.xz":
+		contentType = "xz"
+	default:
+		return nil, errors.New("unsupported archive type")
+	}
+	for _, asset := range release.Assets {
+		if asset.ContentType == fmt.Sprintf("application/%s", contentType) &&
 			strings.Contains(asset.Name, osType) &&
 			strings.Contains(asset.Name, arch) {
 			return &asset, nil
@@ -39,7 +69,12 @@ func downloadAsset(release *Release, archive, osType, arch string) (*Asset, erro
 	}
 	defer out.Close()
 
-	written, err := io.Copy(out, resp.Body)
+	bar := progressbar.DefaultBytes(
+		asset.Size,
+		asset.Name,
+	)
+
+	written, err := io.Copy(io.MultiWriter(out, bar), resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to write asset to file: %w", err)
 	}
