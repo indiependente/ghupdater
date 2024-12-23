@@ -76,7 +76,7 @@ Usage of ghupdater:
   -arch string
     	architecture
   -archive string
-    	archive type (default "zip")
+    	archive type
   -extract string
     	path to extract archive (default ".")
   -list
