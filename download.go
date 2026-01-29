@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"strings"
 
@@ -51,13 +50,13 @@ func selectAsset(release *Release, archive, osType, arch string) (*Asset, error)
 	return nil, errors.New("failed to select asset")
 }
 
-func downloadAsset(release *Release, archive, osType, arch string) (*Asset, error) {
+func downloadAsset(release *Release, archive, osType, arch, token string) (*Asset, error) {
 	asset, err := selectAsset(release, archive, osType, arch)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find asset: %w", err)
 	}
 
-	resp, err := http.Get(asset.BrowserDownloadURL)
+	resp, err := doGET(asset.BrowserDownloadURL, token)
 	if err != nil {
 		return nil, fmt.Errorf("failed to download asset: %w", err)
 	}

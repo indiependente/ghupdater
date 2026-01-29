@@ -68,7 +68,16 @@ gh_2.64.0_macOS_arm64.zip
 gh_2.64.0_windows_arm64.zip
 ```
 
-## Synopsis
+### Private repositories
+
+For private repos, provide a GitHub token so the CLI can access the releases API and download assets. Use either:
+
+- **`GITHUB_TOKEN`** environment variable (recommended in scripts; avoids putting the token in process list or shell history), or
+- **`-token`** flag, e.g. `ghupdater -token "$GITHUB_TOKEN" -owner myorg -repo myapp ...`
+
+The token must have access to the repository: use the **repo** scope for classic Personal Access Tokens, or **Contents: read** for fine-grained PATs. If you get a 404 and the repo is private, the CLI will suggest setting `GITHUB_TOKEN` or using `-token`.
+
+### Synopsis
 
 ```bash
 ghupdater --help
@@ -89,6 +98,8 @@ Usage of ghupdater:
     	repository (mandatory)
   -restart string
     	unit name to restart systemd service
+  -token string
+    	GitHub token for private repos (or set GITHUB_TOKEN)
 ```
 
 ## License
