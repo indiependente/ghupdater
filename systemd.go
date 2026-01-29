@@ -17,21 +17,21 @@ func restartSystemDService(targetSystemdUnit string) error {
 	ctx := context.Background()
 	systemdConnection, err := dbus.NewSystemConnectionContext(ctx)
 	if err != nil {
-		return fmt.Errorf("Failed to connect to systemd: %w", err)
+		return fmt.Errorf("failed to connect to systemd: %w", err)
 	}
 	defer systemdConnection.Close()
 
 	found, err := findUnitByName(ctx, targetSystemdUnit, systemdConnection)
 	if err != nil {
-		return fmt.Errorf("Failed to find unit: %w", err)
+		return fmt.Errorf("failed to find unit: %w", err)
 	}
 	if !found {
-		return fmt.Errorf("Unit %s not found", targetSystemdUnit)
+		return fmt.Errorf("unit %s not found", targetSystemdUnit)
 	}
 
 	err = restartUnit(ctx, targetSystemdUnit, systemdConnection)
 	if err != nil {
-		return fmt.Errorf("Failed to restart unit: %w", err)
+		return fmt.Errorf("failed to restart unit: %w", err)
 	}
 
 	return nil
@@ -40,7 +40,7 @@ func restartSystemDService(targetSystemdUnit string) error {
 func findUnitByName(ctx context.Context, targetSystemdUnit string, conn *dbus.Conn) (bool, error) {
 	units, err := conn.ListUnitsContext(ctx)
 	if err != nil {
-		return false, fmt.Errorf("Failed to list units: %w", err)
+		return false, fmt.Errorf("failed to list units: %w", err)
 	}
 
 	for _, unit := range units {
@@ -61,7 +61,7 @@ func restartUnit(ctx context.Context, targetSystemdUnit string, conn *dbus.Conn)
 		completedRestartCh,
 	)
 	if err != nil {
-		return fmt.Errorf("Failed to restart unit: %w", err)
+		return fmt.Errorf("failed to restart unit: %w", err)
 	}
 
 	// Wait for the restart to complete

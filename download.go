@@ -61,13 +61,13 @@ func downloadAsset(release *Release, archive, osType, arch string) (*Asset, erro
 	if err != nil {
 		return nil, fmt.Errorf("failed to download asset: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	out, err := os.Create(asset.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create file: %w", err)
 	}
-	defer out.Close()
+	defer func() { _ = out.Close() }()
 
 	bar := progressbar.DefaultBytes(
 		asset.Size,
