@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"strings"
 
@@ -56,11 +57,16 @@ func downloadAsset(release *Release, archive, osType, arch, token string) (*Asse
 		return nil, fmt.Errorf("failed to find asset: %w", err)
 	}
 
-	resp, err := doGET(asset.BrowserDownloadURL, token)
+	resp, err := doGETAsset(asset.BrowserDownloadURL, asset.URL, token)
 	if err != nil {
 		return nil, fmt.Errorf("failed to download asset: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("download failed: status %d: %s", resp.StatusCode, string(body))
+	}
 
 	out, err := os.Create(asset.Name)
 	if err != nil {

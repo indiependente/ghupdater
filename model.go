@@ -7,6 +7,7 @@ type Release struct {
 
 type Asset struct {
 	Name               string `json:"name"`
+	URL                string `json:"url"` // API URL for authenticated downloads; use with Accept: application/octet-stream
 	BrowserDownloadURL string `json:"browser_download_url"`
 	ContentType        string `json:"content_type"`
 	Size               int64  `json:"size"`
