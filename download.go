@@ -51,17 +51,22 @@ func selectAsset(release *Release, archive, osType, arch string) (*Asset, error)
 	return nil, errors.New("failed to select asset")
 }
 
-func downloadAsset(release *Release, archive, osType, arch string) (*Asset, error) {
+func downloadAsset(release *Release, archive, osType, arch, token string) (*Asset, error) {
 	asset, err := selectAsset(release, archive, osType, arch)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find asset: %w", err)
 	}
 
-	resp, err := http.Get(asset.BrowserDownloadURL)
+	resp, err := doGETAsset(asset.BrowserDownloadURL, asset.URL, token)
 	if err != nil {
 		return nil, fmt.Errorf("failed to download asset: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("download failed: status %d: %s", resp.StatusCode, string(body))
+	}
 
 	out, err := os.Create(asset.Name)
 	if err != nil {

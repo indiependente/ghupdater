@@ -9,6 +9,7 @@ import (
 var (
 	owner       = flag.String("owner", "", "owner (mandatory)")
 	repo        = flag.String("repo", "", "repository (mandatory)")
+	token       = flag.String("token", "", "GitHub token for private repos (or set GITHUB_TOKEN)")
 	archive     = flag.String("archive", "", "archive type")
 	osType      = flag.String("os", "", "operating system")
 	arch        = flag.String("arch", "", "architecture")
@@ -20,6 +21,7 @@ var (
 type runConfig struct {
 	owner       string
 	repo        string
+	token       string
 	archive     string
 	osType      string
 	arch        string
@@ -35,9 +37,14 @@ func main() {
 		panic(err)
 	}
 
+	tokenVal := *token
+	if tokenVal == "" {
+		tokenVal = os.Getenv("GITHUB_TOKEN")
+	}
 	if err := run(runConfig{
 		owner:       *owner,
 		repo:        *repo,
+		token:       tokenVal,
 		archive:     *archive,
 		osType:      *osType,
 		arch:        *arch,
@@ -51,7 +58,7 @@ func main() {
 
 func run(c runConfig) error {
 	fmt.Printf("Get %s/%s latest release\n", c.owner, c.repo)
-	release, err := getRelease(c.owner, c.repo)
+	release, err := getRelease(c.owner, c.repo, c.token)
 	if err != nil {
 		return fmt.Errorf("failed to get release: %w", err)
 	}
@@ -69,7 +76,7 @@ func run(c runConfig) error {
 		return nil
 	}
 	fmt.Printf("Selected tag %s\n", release.TagName)
-	asset, err := downloadAsset(release, c.archive, c.osType, c.arch)
+	asset, err := downloadAsset(release, c.archive, c.osType, c.arch, c.token)
 	if err != nil {
 		return fmt.Errorf("failed to download asset: %w", err)
 	}

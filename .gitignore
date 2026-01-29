@@ -1,3 +1,5 @@
 bin/
+ghupdater
 *.json
 coverage.out
+out/
