@@ -13,8 +13,7 @@ const (
 	timeout     = 30 * time.Second
 )
 
-func restartSystemDService(targetSystemdUnit string) error {
-	ctx := context.Background()
+func restartSystemDService(ctx context.Context, targetSystemdUnit string) error {
 	systemdConnection, err := dbus.NewSystemConnectionContext(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to connect to systemd: %w", err)
@@ -66,10 +65,15 @@ func restartUnit(ctx context.Context, targetSystemdUnit string, conn *dbus.Conn)
 
 	// Wait for the restart to complete
 	select {
-	case <-completedRestartCh:
+	case res := <-completedRestartCh:
+		if res != "done" {
+			return fmt.Errorf("restart job failed: %s", res)
+		}
 		fmt.Printf("Restart job completed for unit: %s\n", targetSystemdUnit)
 	case <-time.After(timeout):
-		fmt.Printf("Timed out waiting for restart job to complete for unit: %s\n", targetSystemdUnit)
+		return fmt.Errorf("timed out waiting for restart job to complete for unit: %s", targetSystemdUnit)
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 	return nil
 }

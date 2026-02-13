@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,9 +13,9 @@ const (
 	ghAPIURL = "https://api.github.com/repos/%s/%s/releases/latest"
 )
 
-func getRelease(owner, repo, token string) (*Release, error) {
+func getRelease(ctx context.Context, owner, repo, token string) (*Release, error) {
 	url := fmt.Sprintf(ghAPIURL, owner, repo)
-	resp, err := doGET(url, token)
+	resp, err := doGET(ctx, url, token)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get metadata: %w", err)
 	}

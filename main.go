@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
+	"time"
 )
 
 var (
@@ -16,7 +18,12 @@ var (
 	list        = flag.Bool("list", false, "list available assets")
 	extractPath = flag.String("extract", ".", "path to extract archive")
 	restart     = flag.String("restart", "", "unit name to restart systemd service")
+	cleanup     = flag.Bool("cleanup", false, "remove archive after extraction")
+	dryRun      = flag.Bool("dry-run", false, "simulate actions without changes")
+	showVersion = flag.Bool("version", false, "show version")
 )
+
+var version = "dev"
 
 type runConfig struct {
 	owner       string
@@ -28,10 +35,18 @@ type runConfig struct {
 	extractPath string
 	restart     string
 	list        bool
+	cleanup     bool
+	dryRun      bool
 }
 
 func main() {
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Printf("ghupdater version %s\n", version)
+		os.Exit(0)
+	}
+
 	err := validateFlags(*owner, *repo)
 	if err != nil {
 		panic(err)
@@ -41,7 +56,11 @@ func main() {
 	if tokenVal == "" {
 		tokenVal = os.Getenv("GITHUB_TOKEN")
 	}
-	if err := run(runConfig{
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	if err := run(ctx, runConfig{
 		owner:       *owner,
 		repo:        *repo,
 		token:       tokenVal,
@@ -51,14 +70,16 @@ func main() {
 		extractPath: *extractPath,
 		restart:     *restart,
 		list:        *list,
+		cleanup:     *cleanup,
+		dryRun:      *dryRun,
 	}); err != nil {
 		panic(err)
 	}
 }
 
-func run(c runConfig) error {
+func run(ctx context.Context, c runConfig) error {
 	fmt.Printf("Get %s/%s latest release\n", c.owner, c.repo)
-	release, err := getRelease(c.owner, c.repo, c.token)
+	release, err := getRelease(ctx, c.owner, c.repo, c.token)
 	if err != nil {
 		return fmt.Errorf("failed to get release: %w", err)
 	}
@@ -76,7 +97,24 @@ func run(c runConfig) error {
 		return nil
 	}
 	fmt.Printf("Selected tag %s\n", release.TagName)
-	asset, err := downloadAsset(release, c.archive, c.osType, c.arch, c.token)
+
+	if c.dryRun {
+		asset, err := selectAsset(release, c.archive, c.osType, c.arch)
+		if err != nil {
+			return fmt.Errorf("failed to select asset: %w", err)
+		}
+		fmt.Printf("[Dry Run] Would download asset %s\n", asset.Name)
+		fmt.Printf("[Dry Run] Would extract to %s\n", c.extractPath)
+		if c.cleanup {
+			fmt.Printf("[Dry Run] Would remove %s after extraction\n", asset.Name)
+		}
+		if c.restart != "" {
+			fmt.Printf("[Dry Run] Would restart systemd service %s\n", c.restart)
+		}
+		return nil
+	}
+
+	asset, err := downloadAsset(ctx, release, c.archive, c.osType, c.arch, c.token)
 	if err != nil {
 		return fmt.Errorf("failed to download asset: %w", err)
 	}
@@ -99,9 +137,17 @@ func run(c runConfig) error {
 	}
 	fmt.Println("Asset extracted")
 
+	if c.cleanup {
+		fmt.Printf("Removing asset %s\n", asset.Name)
+		if err := os.Remove(asset.Name); err != nil {
+			return fmt.Errorf("failed to remove asset: %w", err)
+		}
+		fmt.Println("Asset removed")
+	}
+
 	if c.restart != "" {
 		fmt.Printf("Restarting systemd service %s\n", c.restart)
-		err = restartSystemDService(c.restart)
+		err = restartSystemDService(ctx, c.restart)
 		if err != nil {
 			return fmt.Errorf("failed to restart systemd service: %w", err)
 		}

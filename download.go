@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -25,23 +26,13 @@ func listAssets(release *Release, archive, osType, arch string) []string {
 }
 
 func selectAsset(release *Release, archive, osType, arch string) (*Asset, error) {
-	var contentType string
-	switch archive {
-	case "zip":
-		contentType = "zip"
-	case "tar":
-		contentType = "x-tar"
-	case "tar.gz":
-		contentType = "gzip"
-	case "tar.bz2":
-		contentType = "bzip2"
-	case "tar.xz":
-		contentType = "xz"
-	default:
-		return nil, errors.New("unsupported archive type")
+	if archive == "" {
+		return nil, errors.New("archive type is required")
 	}
+	suffix := "." + archive
+
 	for _, asset := range release.Assets {
-		if asset.ContentType == fmt.Sprintf("application/%s", contentType) &&
+		if strings.HasSuffix(asset.Name, suffix) &&
 			strings.Contains(asset.Name, osType) &&
 			strings.Contains(asset.Name, arch) {
 			return &asset, nil
@@ -51,13 +42,13 @@ func selectAsset(release *Release, archive, osType, arch string) (*Asset, error)
 	return nil, errors.New("failed to select asset")
 }
 
-func downloadAsset(release *Release, archive, osType, arch, token string) (*Asset, error) {
+func downloadAsset(ctx context.Context, release *Release, archive, osType, arch, token string) (*Asset, error) {
 	asset, err := selectAsset(release, archive, osType, arch)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find asset: %w", err)
 	}
 
-	resp, err := doGETAsset(asset.BrowserDownloadURL, asset.URL, token)
+	resp, err := doGETAsset(ctx, asset.BrowserDownloadURL, asset.URL, token)
 	if err != nil {
 		return nil, fmt.Errorf("failed to download asset: %w", err)
 	}
